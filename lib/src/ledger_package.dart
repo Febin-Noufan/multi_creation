@@ -3,8 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:multi_creation/multi_creation.dart';
 import 'package:multi_creation/src/models/internal_ledger_model.dart';
 
-
-
 // Main Ledger Widget
 class MulipleCreationWidget extends StatefulWidget {
   final List<FieldConfig> fieldConfigs;
@@ -50,10 +48,12 @@ class _MulipleCreationWidgettState extends State<MulipleCreationWidget> {
   }
 
   void _saveLedgers() {
-     bool isValid = _ledgers.every((ledger) {
+    bool isValid = _ledgers.every((ledger) {
+      // Skip validation for completely empty rows
+      if (!ledger.isEdited) return true;
+
       return widget.fieldConfigs.every((config) {
-        if (config.type == FieldType.dropdown &&
-            config.name != 'type') {
+        if (config.type == FieldType.dropdown && config.name != 'type') {
           return ledger.values[config.name] != null;
         } else if (config.type != FieldType.dropdown) {
           return ledger.values[config.name]?.isNotEmpty == true;
@@ -61,7 +61,6 @@ class _MulipleCreationWidgettState extends State<MulipleCreationWidget> {
         return true;
       });
     });
-
 
     if (!isValid) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -73,95 +72,94 @@ class _MulipleCreationWidgettState extends State<MulipleCreationWidget> {
       return;
     }
 
+    // Filter out completely empty rows before saving
+    final List<Map<String, dynamic>> result = _ledgers
+        .where((ledger) => ledger.isEdited)
+        .map((ledger) => ledger.values)
+        .toList();
 
-      final List<Map<String, dynamic>> result = _ledgers.map((ledger) => ledger.values).toList();
     widget.onSave(result);
-       // Clear the existing data and add an empty row after save
-       _clearData();
+
+    // Clear the existing data and add an empty row after save
+    _clearData();
   }
 
-   void _clearData() {
+  void _clearData() {
     setState(() {
-        _ledgers.clear();
-       _focusNodes.clear();
-      _currentIndex=0;
-      _currentField=0;
+      _ledgers.clear();
+      _focusNodes.clear();
+      _currentIndex = 0;
+      _currentField = 0;
 
       _addNewLedger(); // Add a new, empty row
     });
   }
 
-  
+  void handleKeyPress(RawKeyEvent event) {
+    if (event is RawKeyDownEvent) {
+      if (event.logicalKey == LogicalKeyboardKey.enter ||
+          event.logicalKey == LogicalKeyboardKey.tab) {
+        _moveToNextField(fromKeyboard: true);
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+        _moveDown();
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+        _moveUp();
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+        _moveLeft();
+      } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+        _moveRight();
+      }
+    }
+  }
 
-     void handleKeyPress(RawKeyEvent event) {
-      if (event is RawKeyDownEvent) {
-        if (event.logicalKey == LogicalKeyboardKey.enter ||
-            event.logicalKey == LogicalKeyboardKey.tab) {
-          _moveToNextField(fromKeyboard: true);
-        } else if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-          _moveDown();
-        } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-          _moveUp();
-        } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-          _moveLeft();
-        } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-          _moveRight();
+  void _moveLeft() {
+    if (_currentField > 0) {
+      setState(() {
+        _currentField--;
+        _focusNodes[_currentIndex][_currentField].requestFocus();
+      });
+    }
+  }
+
+  void _moveRight() {
+    if (_currentField < widget.fieldConfigs.length - 1) {
+      setState(() {
+        _currentField++;
+        _focusNodes[_currentIndex][_currentField].requestFocus();
+      });
+    }
+  }
+
+  void _moveToNextField({bool fromKeyboard = false}) {
+    setState(() {
+      if (fromKeyboard) {
+        bool allRequiredFilled = true;
+        // Check if the current row's required fields are filled
+        if (_ledgers.isNotEmpty) {
+          final currentRow = _ledgers[_currentIndex];
+          allRequiredFilled = widget.fieldConfigs.every((config) {
+            if (config.type == FieldType.dropdown && config.name != 'type') {
+              return currentRow.values[config.name] != null;
+            } else if (config.type != FieldType.dropdown) {
+              return currentRow.values[config.name]?.isNotEmpty == true;
+            }
+            return true;
+          });
+        }
+
+        if (_currentField >= widget.fieldConfigs.length - 1) {
+          _currentField = 0;
+          if (_currentIndex == _ledgers.length - 1 && allRequiredFilled) {
+            _addNewLedger();
+          }
+          _unfocusRowFields(_currentIndex);
+          if (allRequiredFilled) {
+            _currentIndex++;
+          }
+        } else {
+          _currentField++;
         }
       }
-    }
-
-        void _moveLeft() {
-      if (_currentField > 0) {
-        setState(() {
-          _currentField--;
-          _focusNodes[_currentIndex][_currentField].requestFocus();
-        });
-      }
-    }
-
-    void _moveRight() {
-       if (_currentField < widget.fieldConfigs.length - 1) {
-        setState(() {
-          _currentField++;
-          _focusNodes[_currentIndex][_currentField].requestFocus();
-        });
-      }
-    }
-
-    
-   void _moveToNextField({bool fromKeyboard = false}) {
-    setState(() {
-         if (fromKeyboard) {
-            bool allRequiredFilled = true;
-            // Check if the current row's required fields are filled
-            if (_ledgers.isNotEmpty) {
-              final currentRow = _ledgers[_currentIndex];
-               allRequiredFilled = widget.fieldConfigs.every((config) {
-                if (config.type == FieldType.dropdown &&
-                  config.name != 'type') {
-                  return currentRow.values[config.name] != null;
-                } else if (config.type != FieldType.dropdown) {
-                   return currentRow.values[config.name]?.isNotEmpty == true;
-                 }
-                 return true;
-               });
-
-            }
-
-             if (_currentField >= widget.fieldConfigs.length - 1) {
-                  _currentField = 0;
-                 if (_currentIndex == _ledgers.length - 1 && allRequiredFilled) {
-                   _addNewLedger();
-                 }
-                _unfocusRowFields(_currentIndex);
-                if(allRequiredFilled){
-                _currentIndex++;
-                }
-                } else {
-               _currentField++;
-             }
-          }
-
 
       if (_currentIndex < _focusNodes.length &&
           _currentField < _focusNodes[_currentIndex].length) {
@@ -188,55 +186,51 @@ class _MulipleCreationWidgettState extends State<MulipleCreationWidget> {
   }
 
   void _moveDown() {
-      if (_currentIndex < _ledgers.length - 1) {
-        setState(() {
-          _currentIndex++;
-          _focusNodes[_currentIndex][_currentField].requestFocus();
+    if (_currentIndex < _ledgers.length - 1) {
+      setState(() {
+        _currentIndex++;
+        _focusNodes[_currentIndex][_currentField].requestFocus();
+      });
+    } else {
+      if (_ledgers.isNotEmpty) {
+        bool allRequiredFilled = true;
+        final currentRow = _ledgers[_currentIndex];
+        allRequiredFilled = widget.fieldConfigs.every((config) {
+          if (config.type == FieldType.dropdown && config.name != 'type') {
+            return currentRow.values[config.name] != null;
+          } else if (config.type != FieldType.dropdown) {
+            return currentRow.values[config.name]?.isNotEmpty == true;
+          }
+          return true;
         });
-      }
-        else {
-          if(_ledgers.isNotEmpty)
-         {
-           bool allRequiredFilled = true;
-             final currentRow = _ledgers[_currentIndex];
-             allRequiredFilled = widget.fieldConfigs.every((config) {
-               if (config.type == FieldType.dropdown &&
-                   config.name != 'type') {
-                 return currentRow.values[config.name] != null;
-               } else if (config.type != FieldType.dropdown) {
-                  return currentRow.values[config.name]?.isNotEmpty == true;
-               }
-               return true;
-             });
 
-           if(allRequiredFilled){
-             _addNewLedger();
-              setState(() {
-                _currentIndex++;
-                _focusNodes[_currentIndex][_currentField].requestFocus();
-              });
-
-           }
-         }
+        if (allRequiredFilled) {
+          _addNewLedger();
+          setState(() {
+            _currentIndex++;
+            _focusNodes[_currentIndex][_currentField].requestFocus();
+          });
         }
-    }
-
-
-    void _moveUp() {
-      if (_currentIndex > 0) {
-        setState(() {
-          _currentIndex--;
-          _focusNodes[_currentIndex][_currentField].requestFocus();
-        });
       }
     }
+  }
 
-    Widget _buildField(FieldConfig config, int rowIndex, int fieldIndex) {
+  void _moveUp() {
+    if (_currentIndex > 0) {
+      setState(() {
+        _currentIndex--;
+        _focusNodes[_currentIndex][_currentField].requestFocus();
+      });
+    }
+  }
+
+  Widget _buildField(FieldConfig config, int rowIndex, int fieldIndex) {
     switch (config.type) {
       case FieldType.text:
         return TextField(
           controller: TextEditingController(
-            text: _ledgers[rowIndex].values[config.name]?.toString() ?? '', // Set initial value from model
+            text: _ledgers[rowIndex].values[config.name]?.toString() ??
+                '', // Set initial value from model
           ),
           focusNode: _focusNodes[rowIndex][fieldIndex],
           autofocus: rowIndex == 0 && fieldIndex == 0,
@@ -248,39 +242,39 @@ class _MulipleCreationWidgettState extends State<MulipleCreationWidget> {
           },
         );
 
-       case FieldType.dropdown:
-         return DropdownButtonFormField<String>(
-            focusNode: _focusNodes[rowIndex][fieldIndex],
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-            ),
-           value: _ledgers[rowIndex].values[config.name]?.toString(),
-           items: config.dropdownItems?.map((String item) {
-             return DropdownMenuItem<String>(
-               value: item,
-               child: Text(item == 'Debit'
-                   ? 'Dr'
-                   : item == 'Credit'
-                       ? 'Cr'
-                       : item),
-             );
-           }).toList(),
-            onChanged: (value) {
-              setState(() {
-                _ledgers[rowIndex].setValue(config.name, value);
-                if (config.name == 'type') {
-                    _ledgers[rowIndex].isDebit = value == 'Debit';
-                  }
-              });
-             _moveToNextField();
-           },
-         );
-
+      case FieldType.dropdown:
+        return DropdownButtonFormField<String>(
+          focusNode: _focusNodes[rowIndex][fieldIndex],
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+          ),
+          value: _ledgers[rowIndex].values[config.name]?.toString(),
+          items: config.dropdownItems?.map((String item) {
+            return DropdownMenuItem<String>(
+              value: item,
+              child: Text(item == 'Debit'
+                  ? 'Dr'
+                  : item == 'Credit'
+                      ? 'Cr'
+                      : item),
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              _ledgers[rowIndex].setValue(config.name, value);
+              if (config.name == 'type') {
+                _ledgers[rowIndex].isDebit = value == 'Debit';
+              }
+            });
+            _moveToNextField();
+          },
+        );
 
       case FieldType.number:
         return TextField(
-           controller: TextEditingController(
-            text: _ledgers[rowIndex].values[config.name]?.toString() ?? '', // Set initial value from model
+          controller: TextEditingController(
+            text: _ledgers[rowIndex].values[config.name]?.toString() ??
+                '', // Set initial value from model
           ),
           focusNode: _focusNodes[rowIndex][fieldIndex],
           decoration: InputDecoration(
@@ -294,6 +288,7 @@ class _MulipleCreationWidgettState extends State<MulipleCreationWidget> {
         );
     }
   }
+
   @override
   Widget build(BuildContext context) {
     return RawKeyboardListener(
@@ -341,22 +336,28 @@ class _MulipleCreationWidgettState extends State<MulipleCreationWidget> {
               },
             ),
           ),
-          widget.footer ??
-              Container(
-                padding: const EdgeInsets.all(16),
-                color: Colors.grey[200],
-                child: Row(
-                  children: [
-                    const Text('Total Ledgers: '),
-                    Text(_ledgers.length.toString()),
-                    const Spacer(),
-                    ElevatedButton(
-                      onPressed: _saveLedgers,
-                      child: const Text('Save (Alt + S)'),
-                    ),
-                  ],
-                ),
+        widget.footer ??
+    ValueListenableBuilder(
+      valueListenable: ValueNotifier(_ledgers.length),
+      builder: (context, value, child) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          color: Colors.grey[200],
+          child: Row(
+            children: [
+              const Text('Total Items: '), 
+              Text(_ledgers.length.toString()), // Updated to show total ledgers
+              const Spacer(),
+              ElevatedButton(
+                onPressed: _saveLedgers,
+                child: const Text('Save (Alt + S)'),
               ),
+            ],
+          ),
+        );
+      },
+    ),
+
         ],
       ),
     );
