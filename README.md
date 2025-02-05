@@ -1,4 +1,4 @@
-# My Ledger Package
+
 
 A reusable Flutter package for creating multiple ledger entries with keyboard navigation.
 
@@ -40,7 +40,6 @@ TallyLedgerWidget(
 );
 
 
-------------------------------------------------------------------------------------------------------------------------------------
 Example 
 
 >>>>>>>>>>>>>>>>>>>>>>>>>
